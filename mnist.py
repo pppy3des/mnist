@@ -14,19 +14,27 @@ yy = tf.nn.softmax(tf.matmul(x, W) + b)
 cross_entropy = -tf.reduce_sum(y * tf.log(yy))
 train_step = tf.train.GradientDescentOptimizer(0.01).minimize(cross_entropy)
 
+correct_prediction = tf.equal(tf.argmax(yy, 1), tf.argmax(y, 1))
+accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+tf.summary.scalar("accuracy", accuracy)
+
 saver = tf.train.Saver()
 
 init = tf.global_variables_initializer()
-sess = tf.Session()
-sess.run(init)
+with tf.Session() as sess:
+  sess.run(init)
 
-for i in range(1000):
-  batch_xs, batch_ys = mnist.train.next_batch(100)
-  sess.run(train_step, feed_dict={x: batch_xs, y: batch_ys})
+  merged = tf.summary.merge_all()
+  writer = tf.summary.FileWriter("./tmp/logs/mnist", sess.graph)
 
-correct_prediction = tf.equal(tf.argmax(yy, 1), tf.argmax(y, 1))
-accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+  for i in range(1000):
+    batch_xs, batch_ys = mnist.train.next_batch(100)
 
-print(sess.run(accuracy, feed_dict={x: mnist.test.images, y: mnist.test.labels}))
+    if i % 100 == 0:
+      train_accuracy = accuracy.eval(feed_dict={x: batch_xs, y: batch_ys})
+      print("step %d, training accuray %g"%(i, train_accuracy))
 
-saver.save(sess, "tmp/mnist/mnist.ckpt")
+    summary, _ = sess.run([merged, train_step], feed_dict={x: batch_xs, y: batch_ys})
+    writer.add_summary(summary, global_step=i)
+
+  saver.save(sess, "tmp/mnist/mnist.ckpt")
